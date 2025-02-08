@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
 from models import WeeklyReportState, TopicStructure
@@ -6,6 +6,9 @@ from topic_extractor import TopicExtractor
 from query_optimizer import QueryOptimizer
 from search_executor import SearchExecutor
 from report_generator import ReportGenerator
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class WeeklyReportGraph:
@@ -70,17 +73,45 @@ class WeeklyReportGraph:
 
     def _generate_report(self, state: WeeklyReportState) -> Dict[str, Any]:
         """レポート生成ノード"""
-        final_report = self.report_generator.run(
+        final_report, saved_file, slack_success = self.report_generator.run(
             journal_text=state.journal_text,
             topics=state.extracted_topics,
-            search_results=state.search_results
+            search_results=state.search_results,
+            save_to_file=state.save_to_file,
+            send_to_slack=state.send_to_slack
         )
         return {
-            "final_report": final_report
+            "final_report": final_report,
+            "saved_file": saved_file,
+            "slack_success": slack_success
         }
 
-    def invoke(self, journal_text: str, debug: bool = False) -> str:
-        """グラフの実行"""
-        initial_state = WeeklyReportState(journal_text=journal_text)
+    def invoke(
+        self,
+        journal_text: str,
+        debug: bool = False,
+        save_to_file: bool = True,
+        send_to_slack: bool = True
+    ) -> Tuple[str, str | None, bool]:
+        """グラフの実行
+        
+        Args:
+            journal_text: Slackのログテキスト
+            debug: デバッグモードを有効にするかどうか
+            save_to_file: レポートをファイルに保存するかどうか
+            send_to_slack: レポートをSlackに送信するかどうか
+            
+        Returns:
+            Tuple[str, str | None, bool]: (生成されたレポート, 保存されたファイルパス, Slack送信成功フラグ)
+        """
+        initial_state = WeeklyReportState(
+            journal_text=journal_text,
+            save_to_file=save_to_file,
+            send_to_slack=send_to_slack
+        )
         final_state = self.graph.invoke(initial_state)
-        return final_state["final_report"]
+        return (
+            final_state["final_report"],
+            final_state.get("saved_file"),
+            final_state.get("slack_success", False)
+        )

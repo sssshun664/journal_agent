@@ -2,6 +2,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
 from src.models import TopicStructure
+from src.utils.slack import send_to_slack
+from datetime import datetime
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ReportGenerator:
@@ -91,13 +97,65 @@ class ReportGenerator:
 上記の手順と書き方を徹底して、過去7日分のSlackログ＆補足情報を参照しながら、**ポップでありつつも深みのある**週次レポートを作成してください。
 """
 
+    def save_report(self, report: str) -> str:
+        """生成されたレポートをファイルに保存する
+        
+        Args:
+            report: 生成されたレポート文字列
+            
+        Returns:
+            保存されたファイルのパス
+        """
+        # reportsディレクトリが存在しない場合は作成
+        os.makedirs("reports", exist_ok=True)
+        
+        # タイムスタンプを含むファイル名を生成
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"reports/weekly_report_{timestamp}.txt"
+        
+        # レポートをファイルに保存
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(report)
+            
+        return filename
+
+    def send_to_slack(self, report: str) -> bool:
+        """生成されたレポートをSlackに送信する
+        
+        Args:
+            report: 送信するレポート文字列
+            
+        Returns:
+            bool: 送信が成功したかどうか
+        """
+        try:
+            result = send_to_slack(report)
+            return result["success"]
+        except Exception as e:
+            logger.error(f"Failed to send report to Slack: {str(e)}")
+            return False
+
     def run(
         self,
         journal_text: str,
         topics: TopicStructure,
-        search_results: list[str]
-    ) -> str:
-        # プロンプトテンプレートの作成
+        search_results: list[str],
+        save_to_file: bool = True,
+        send_to_slack: bool = True
+    ) -> tuple[str, str | None, bool]:
+        """レポートを生成し、オプションでファイルに保存しSlackに送信する
+        
+        Args:
+            journal_text: Slackのログテキスト
+            topics: 抽出されたトピック情報
+            search_results: 検索結果のリスト
+            save_to_file: レポートをファイルに保存するかどうか
+            send_to_slack: レポートをSlackに送信するかどうか
+            
+        Returns:
+            tuple[str, str | None, bool]: (生成されたレポート, 保存されたファイルパス, Slack送信成功フラグ)
+        """
+        # チェーンの構築と実行
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             ("human", 
@@ -112,10 +170,9 @@ class ReportGenerator:
             )
         ])
 
-        # チェーンの構築と実行
         chain = prompt | self.llm | StrOutputParser()
         
-        return chain.invoke({
+        report = chain.invoke({
             "journal_text": journal_text,
             "main_topics": topics.main_topics,
             "keywords": topics.keywords,
@@ -123,3 +180,11 @@ class ReportGenerator:
             "context": topics.context,
             "search_results": "\n".join(search_results)
         })
+        
+        # レポートをファイルに保存する場合
+        saved_file = self.save_report(report) if save_to_file else None
+        
+        # レポートをSlackに送信する場合
+        slack_success = self.send_to_slack(report) if send_to_slack else False
+        
+        return report, saved_file, slack_success

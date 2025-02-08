@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 import operator
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,8 @@ class WeeklyReportState(BaseModel):
     
     # Input
     journal_text: str = Field(..., description="7日分のSlackログ")
+    save_to_file: bool = Field(default=True, description="レポートをファイルに保存するかどうか")
+    send_to_slack: bool = Field(default=True, description="レポートをSlackに送信するかどうか")
     
     # TopicExtractor Output
     extracted_topics: TopicStructure = Field(
@@ -39,4 +41,12 @@ class WeeklyReportState(BaseModel):
     final_report: str = Field(
         default="",
         description="最終レポート"
+    )
+    saved_file: Optional[str] = Field(
+        default=None,
+        description="保存されたレポートファイルのパス"
+    )
+    slack_success: bool = Field(
+        default=False,
+        description="Slackへの送信が成功したかどうか"
     )
