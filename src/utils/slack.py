@@ -2,6 +2,7 @@ import os
 import requests
 from typing import Dict, Any
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -45,4 +46,18 @@ def send_to_slack(content: str) -> Dict[str, Any]:
         return {
             "success": False,
             "error": str(e)
-        } 
+        }
+
+def get_slack_messages() -> str:
+    """サンプルのSlackメッセージを取得する
+    
+    Returns:
+        str: サンプルのSlackメッセージテキスト
+    """
+    # サンプルログファイルのパスを取得
+    data_dir = Path(__file__).parent.parent.parent / "data"
+    sample_log_path = data_dir / "sample_log.txt"
+    
+    # サンプルログを読み込む
+    with open(sample_log_path, "r", encoding="utf-8") as f:
+        return f.read() 

@@ -52,4 +52,8 @@ data/
 # Testing
 .coverage
 .pytest_cache/
-htmlcov/ 
+htmlcov/
+
+# Generated files
+outputs/
+reports/ 
