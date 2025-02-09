@@ -9,11 +9,23 @@ def init_vertex_ai():
     """Vertex AI SDKの初期化"""
     project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
     location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     
     if not project_id:
         raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is not set")
+    if not credentials_path:
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set")
     
-    vertexai.init(project=project_id, location=location)
+    # 絶対パスに変換
+    abs_credentials_path = os.path.abspath(credentials_path)
+    if not os.path.exists(abs_credentials_path):
+        raise FileNotFoundError(f"Service account key file not found at: {abs_credentials_path}")
+    
+    vertexai.init(
+        project=project_id,
+        location=location,
+        credentials=abs_credentials_path
+    )
 
 def get_model(temperature: float = 0):
     """ChatVertexAI modelの初期化"""
