@@ -11,23 +11,79 @@ LangChainとLangGraphを使用して、Slackのログを分析し、要約レポ
 
 ## アーキテクチャ
 
+### 技術スタック
+
+- **LLM**: Vertex AI (Gemini-1.5-pro)
+  - 高度な自然言語処理能力
+  - 長いコンテキスト（約100Kトークン）のサポート
+  - 構造化出力の生成
+
+- **フレームワーク**:
+  - LangChain: LLMの操作と統合
+  - LangGraph: ワークフローの制御
+  - Pydantic: データのバリデーションと構造化
+
 ### グラフ構造
 
 ```mermaid
 graph TD;
-    __start__([start]) --> generate_summary
-    generate_summary --> extract_discussion
-    extract_discussion --> generate_query
-    generate_query --> create_report
-    create_report --> __end__([end])
+    __start__([start]) --> generate_summary[要約生成]
+    generate_summary --> extract_discussion[ディスカッションポイント抽出]
+    extract_discussion --> generate_query[リサーチクエリ生成]
+    generate_query --> create_report[レポート作成]
+    create_report --> slack[Slack配信]
+    slack --> __end__([end])
+
+    subgraph 状態管理
+    state[JournalAnalysisState]
+    end
+
+    state -.-> generate_summary
+    state -.-> extract_discussion
+    state -.-> generate_query
+    state -.-> create_report
+    state -.-> slack
 ```
 
 ### コンポーネント
 
-- `SummaryGenerator`: Slackログから要約を生成
-- `DiscussionExtractor`: 要約から重要なディスカッションポイントを抽出
-- `QueryGenerator`: ディスカッションポイントからリサーチクエリを生成
-- `JournalAnalysisGraph`: 全体のワークフローを管理
+#### ノード
+- `SummaryGenerator`: 
+  - Slackログから重要な議論を抽出し、構造化された要約を生成
+  - Markdown形式で出力
+
+- `DiscussionExtractor`:
+  - 要約から重要なディスカッションポイントを抽出
+  - Pydanticモデル（`DiscussionPoints`）で構造化
+
+- `QueryGenerator`:
+  - ディスカッションポイントから英語のリサーチクエリを生成
+  - Pydanticモデル（`ResearchQueries`）で構造化
+
+#### 状態管理
+- `JournalAnalysisState` (TypedDict):
+  - 入力: Slackログテキスト
+  - 中間状態: 要約、ディスカッションポイント、クエリ
+  - 出力: レポートファイルパス、Slack配信状態
+
+#### ユーティリティ
+- `file_handler`: ファイル操作（JSON、Markdown）
+- `slack`: Slack Webhook連携
+
+### データフロー
+
+1. 入力
+   - Slackログ（テキスト）
+
+2. 処理フロー
+   - ログ → 要約（Markdown）
+   - 要約 → ディスカッションポイント（JSON）
+   - ディスカッションポイント → リサーチクエリ（JSON）
+   - 全データ → 最終レポート（Markdown）
+
+3. 出力
+   - ファイル出力（各段階の結果）
+   - Slack配信（最終レポート）
 
 ## セットアップ
 

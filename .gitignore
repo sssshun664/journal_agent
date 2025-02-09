@@ -51,7 +51,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
-data/
+data/*
+!data/.gitkeep
 
 # Testing
 .coverage
